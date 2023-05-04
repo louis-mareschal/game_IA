@@ -1,13 +1,12 @@
-import os
 import pygame
 import typing
-import pickle
 import config
 
 
 class Monster(pygame.sprite.Sprite):
-    def __init__(self, x, y):
+    def __init__(self, x, y, id):
         super().__init__()
+        self.id = id
         self.image = pygame.transform.scale(pygame.image.load(config.IMAGE_MONSTER_PATH), config.IMAGE_SIZE)
         self.pos = pygame.math.Vector2(x, y)
         self.rect = self.image.get_rect(topleft=self.pos)
@@ -19,7 +18,11 @@ class Monster(pygame.sprite.Sprite):
         self.net_monster = net
 
     def get_next_move(self, player_x, player_y):
-        return self.net_monster.activate([self.rect.x - player_x, self.rect.y - player_y])
+        return self.net_monster.activate([player_x - self.rect.x,
+                                          player_y - self.rect.y,
+                                          self.rect.x, self.rect.y,
+                                          config.WINDOW_WIDTH - self.rect.x,
+                                          config.WINDOW_HEIGHT - self.rect.y])
 
     def move(self, next_move_monster: typing.List[float]):
         up = next_move_monster[0] >= 6 / 10

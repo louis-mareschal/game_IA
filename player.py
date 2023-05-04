@@ -1,29 +1,31 @@
 import pygame
 import random
-import os
-import pickle
 import typing
 import config
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, x, y):
+    def __init__(self, x, y, id):
         super().__init__()
+        self.id = id
         self.image = pygame.transform.scale(pygame.image.load(config.IMAGE_PLAYER_PATH), config.IMAGE_SIZE)
         self.pos = pygame.math.Vector2(x, y)
         self.rect = self.image.get_rect(topleft=self.pos)
-        self.speed = config.SPEED*1.5
+        self.speed = config.SPEED * 1.5
         self.diagonal_speed = self.speed / 2 ** 0.5
         self.net_player = None
+        self.life = config.PLAYER_LIFE
 
     def set_net(self, net):
         self.net_player = net
 
     def get_next_move(self, monster_x, monster_y):
         if self.net_player:
-            return self.net_player.activate([monster_x - self.rect.x, monster_y - self.rect.y,
-                                             (self.rect.x - config.WINDOW_WIDTH/2)/(config.WINDOW_WIDTH/2),
-                                             (self.rect.y - config.WINDOW_HEIGHT//2)/(config.WINDOW_WIDTH/2)])
+            return self.net_player.activate([monster_x - self.rect.x,
+                                             monster_y - self.rect.y,
+                                             self.rect.x, self.rect.y,
+                                             config.WINDOW_WIDTH - self.rect.x,
+                                             config.WINDOW_HEIGHT - self.rect.y])
         return random.choice([[1, 0.5], [0, 0.5], [0.5, 0], [0.5, 1], [1, 0], [1, 1], [0, 0], [0, 1]])
 
     def move(self, next_move_player: typing.List[float]):
@@ -59,7 +61,6 @@ class Player(pygame.sprite.Sprite):
             # check if the monster is within the bottom and right screen boundaries
             if self.rect.bottom < config.WINDOW_HEIGHT and self.rect.right < config.WINDOW_WIDTH:
                 self.move_down_right()
-
 
     def move_up(self):
         self.pos.y -= self.speed

@@ -25,10 +25,10 @@ class Monster(pygame.sprite.Sprite):
                                           config.WINDOW_HEIGHT - self.rect.y])
 
     def move(self, next_move_monster: typing.List[float]):
-        up = next_move_monster[0] >= 6 / 10
-        down = next_move_monster[0] <= 4 / 10
-        right = next_move_monster[1] >= 6 / 10
-        left = next_move_monster[1] <= 4 / 10
+        up = next_move_monster[0] >= 8 / 10
+        down = next_move_monster[0] <= 2 / 10
+        right = next_move_monster[1] >= 8 / 10
+        left = next_move_monster[1] <= 2 / 10
 
         if up and not (right or left):
             if self.rect.top > 0:  # check if the monster is within the top screen boundary

@@ -11,10 +11,48 @@ class Player(pygame.sprite.Sprite):
         self.image = pygame.transform.scale(pygame.image.load(config.IMAGE_PLAYER_PATH), config.IMAGE_SIZE)
         self.pos = pygame.math.Vector2(x, y)
         self.rect = self.image.get_rect(topleft=self.pos)
-        self.speed = config.SPEED * 1.5
+        self.speed = config.SPEED
         self.diagonal_speed = self.speed / 2 ** 0.5
         self.net_player = None
         self.life = config.PLAYER_LIFE
+
+        self.vx = random.uniform(-1, 1)
+        self.vy = random.uniform(-1, 1)
+        norm = (self.vx ** 2 + self.vy ** 2) ** 0.5
+        self.vx *= self.speed / norm
+        self.vy *= self.speed / norm
+
+    def move_random(self):
+        self.pos.y += self.vy
+        self.pos.x += self.vx
+        norm = (self.vx ** 2 + self.vy ** 2) ** 0.5
+        vx_var = random.uniform(-0.05 * self.speed, 0.05 * self.speed)
+        vy_var = random.uniform(-0.05 * self.speed, 0.05 * self.speed)
+
+        self.vx += vx_var
+        self.vy += vy_var
+        norm = (self.vx ** 2 + self.vy ** 2) ** 0.5
+        self.vx *= self.speed / norm
+        self.vy *= self.speed / norm
+
+
+
+        # Check if player has hit the edge of the screen
+        if self.rect.left < 0:
+            self.pos.x = 50
+            self.vx *= -1
+        elif self.rect.right > config.WINDOW_WIDTH:
+            self.pos.x = config.WINDOW_WIDTH - 50
+            self.vx *= -1
+
+        if self.rect.top < 0:
+            self.pos.y = 50
+            self.vy *= -1
+        elif self.rect.bottom > config.WINDOW_HEIGHT:
+            self.pos.y = config.WINDOW_HEIGHT - 50
+            self.vy *= -1
+
+        self.rect.topleft = round(self.pos.x), round(self.pos.y)
 
     def set_net(self, net):
         self.net_player = net

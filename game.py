@@ -38,7 +38,8 @@ class Game:
                  config.WINDOW_HEIGHT - monster.rect.y])
 
             monster.move(next_move_monster)
-            player.move(player.get_next_move(monster.rect.x, monster.rect.y))
+            player.move_random()
+            #player.move(player.get_next_move(monster.rect.x, monster.rect.y))
 
             if monster.rect.colliderect(player.rect):
                 player.life -= 1

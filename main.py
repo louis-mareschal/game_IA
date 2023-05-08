@@ -79,7 +79,7 @@ def eval_genomes(genomes, neat_config, training_number: int, training_nets):
         running = True
         paused = False
 
-        im_max = 3000
+        im_max = 6000
         im = 0
 
         time_init.append(time.time() - time_start_episode)
@@ -194,7 +194,7 @@ def run(config_player_path, config_monster_path):
                                       neat.DefaultSpeciesSet, neat.DefaultStagnation,
                                       config_monster_path)
 
-    for training_number in range(1, config.NUMBER_TRAININGS * 2 + 1):
+    for training_number in range(1, 2): # config.NUMBER_TRAININGS * 2 + 1
         if training_number % 2:
             type_training = "monster"
             number_generation = config.NUMBER_GEN_PER_TRAINING

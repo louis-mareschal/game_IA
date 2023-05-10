@@ -1,5 +1,6 @@
 import pygame
 import sys
+import graphviz
 import config
 
 
@@ -45,6 +46,11 @@ class Game:
                 player.life -= 1
                 ge[monster.id].fitness += 0.1
             ge[monster.id].fitness -= 0.1
+
+            min_dist_wall = min(monster.rect.left, monster.rect.top, config.WINDOW_WIDTH - monster.rect.right,
+                                config.WINDOW_HEIGHT - monster.rect.bottom)
+
+            ge[monster.id].fitness -= min(5, 1/(min_dist_wall/10 + 0.01))
 
 
             if player.life == 0:
@@ -169,3 +175,43 @@ class Game:
         screen.blit(monster.image, monster.rect)
 
         pygame.display.flip()
+
+
+
+
+    # def display_network(self):
+    #     network_display = pygame.Surface((200, 200))
+    #     network_display.fill((255, 255, 255))
+    #     generate_visualized_network(genome, nodes)
+    #     render_visualized_network(genome, nodes, network_display)
+    #
+    # def generate_visualized_network(self, genome, nodes):
+    #     """Generate the positions/colors of the neural network nodes"""
+    #     for i in genome.get_nodes():
+    #         if genome.is_input(i):
+    #             color = (0, 0, 255)
+    #             x = 50
+    #             y = 140 + i * 60
+    #         elif genome.is_output(i):
+    #             color = (255, 0, 0)
+    #             x = NETWORK_WIDTH - 50
+    #             y = HEIGHT / 2
+    #         else:
+    #             color = (0, 0, 0)
+    #             x = random.randint(NETWORK_WIDTH / 3, int(NETWORK_WIDTH * (2.0 / 3)))
+    #             y = random.randint(20, HEIGHT - 20)
+    #         nodes[i] = [(int(x), int(y)), color]
+    #
+    # def render_visualized_network(self, genome, nodes, display):
+    #     """Render the visualized neural network"""
+    #     genes = genome.get_edges()
+    #     for edge in genes:
+    #         if genes[edge].enabled:  # Enabled or disabled edge
+    #             color = (0, 255, 0)
+    #         else:
+    #             color = (255, 0, 0)
+    #
+    #         pygame.draw.line(display, color, nodes[edge[0]][0], nodes[edge[1]][0], 3)
+    #
+    #     for n in nodes:
+    #         pygame.draw.circle(display, nodes[n][1], nodes[n][0], 7)

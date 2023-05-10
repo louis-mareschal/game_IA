@@ -1,9 +1,10 @@
 import os
 import pygame
 import neat
-from GenomeReporter import GenomeReporter
+from neat_modified.population import Population
+from neat_modified.checkpoint_reporter import Checkpointer
 import random
-import pickle
+from random import randint
 from game import Game
 from monster import Monster
 from player import Player
@@ -17,19 +18,16 @@ screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
 os.environ['SDL_VIDEO_WINDOW_POS'] = "0,0"
 pygame.mouse.set_visible(False)
 
-GENERATION = 0
 
-
-def eval_genomes(genomes, neat_config, training_number: int, training_nets):
+def eval_genomes(population, training_number: int, training_nets):
     """
     Runs the simulation of the current population of
     monsters or players and sets their fitness based on how many times they collide with their opponent.
     The training_number is to know if we are currently training the monsters or the players and how many trainings we
     did : if training_number is odd, it is training the monsters and if it's even, the players.
     """
+    genomes, neat_config = list(population.population.items()), population.config
     # Updating the generation number
-    global GENERATION
-    GENERATION += 1
     nets = []
     ge = []
     display_one_pair = False
@@ -48,11 +46,11 @@ def eval_genomes(genomes, neat_config, training_number: int, training_nets):
         ge.append(genome)
 
     purged_episode = [50]
-    for episode in range(1, config.NUMBER_NETS_TRAINING + 1):
+    for episode in range(1, 2):  # config.NUMBER_NETS_TRAINING + 1
 
         time_start_episode = time.time()
 
-        game = Game(GENERATION, training_number, episode)
+        game = Game(population.generation, training_number, episode)
         if episode in purged_episode:
             print(f"PURGING AT EPISODE {episode}")
             ge, nets = game.purge(ge, nets)
@@ -60,8 +58,8 @@ def eval_genomes(genomes, neat_config, training_number: int, training_nets):
                 print(f"ERROR AFTER PURGE : len(ge)={len(ge)} len(nets)={len(nets)} ")
                 raise ValueError
 
-        x_players, y_players = 200, 400  # randint(100, config.WINDOW_WIDTH - 100), randint(100, config.WINDOW_HEIGHT - 100)
-        x_monsters, y_monsters = 800, 200  # randint(100, config.WINDOW_WIDTH - 100), randint(100, config.WINDOW_HEIGHT - 100)
+        x_players, y_players = randint(100, config.WINDOW_WIDTH - 100), randint(100, config.WINDOW_HEIGHT - 100)
+        x_monsters, y_monsters = randint(100, config.WINDOW_WIDTH - 100), randint(100, config.WINDOW_HEIGHT - 100)
         for index_entity in range(len(ge)):
             # Creating the monsters
             monster = Monster(x_monsters, y_monsters, index_entity)
@@ -131,8 +129,8 @@ def eval_genomes(genomes, neat_config, training_number: int, training_nets):
 
     # Display the best genome only against all the training nets genomes
     if display_best_only:
-        for episode in range(1, config.NUMBER_NETS_TRAINING+1):
-            game = Game(GENERATION, training_number, episode)
+        for episode in range(1, 2):  # config.NUMBER_NETS_TRAINING+1
+            game = Game(population.generation, training_number, episode)
             x_player, y_player = 200, 400
             x_monster, y_monster = 800, 200
             monster = Monster(x_monster, y_monster, best_id)
@@ -185,7 +183,6 @@ def eval_genomes(genomes, neat_config, training_number: int, training_nets):
 
 def run(config_player_path, config_monster_path):
     # Load configuration.
-    global GENERATION
     training_nets = []
     neat_config_player = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
                                      neat.DefaultSpeciesSet, neat.DefaultStagnation,
@@ -194,7 +191,7 @@ def run(config_player_path, config_monster_path):
                                       neat.DefaultSpeciesSet, neat.DefaultStagnation,
                                       config_monster_path)
 
-    for training_number in range(1, 2): # config.NUMBER_TRAININGS * 2 + 1
+    for training_number in range(1, 2):  # config.NUMBER_TRAININGS * 2 + 1
         if training_number % 2:
             type_training = "monster"
             number_generation = config.NUMBER_GEN_PER_TRAINING
@@ -206,53 +203,28 @@ def run(config_player_path, config_monster_path):
             neat_config = neat_config_player
 
         print(f"#### Training {type_training.capitalize()}s n°{(training_number + 1) // 2} ####")
-        GENERATION = 0
 
         # Create the population or load the last checkpoint
         checkpoint_dir_path = os.path.join(os.getcwd(), f"checkpoint_{type_training}")
         if len(os.listdir(checkpoint_dir_path)):
-            checkpoint_path = os.path.join(checkpoint_dir_path, os.listdir(checkpoint_dir_path)[-1])
-            p = neat.Checkpointer.restore_checkpoint(checkpoint_path)
+            checkpoint_name = sorted(os.listdir(checkpoint_dir_path), key=lambda name: int(name[11:]))[-1]
+            checkpoint_path = os.path.join(checkpoint_dir_path, checkpoint_name)
+            p = Checkpointer.restore_checkpoint(checkpoint_path)
         else:
-            print("\n\n WARNING : CREATING A NEW POPULATION FROM SCRATCH \n\n")
-            p = neat.Population(neat_config)
-
-        # Add a stdout reporter to show progress in the terminal.
-        # p.add_reporter(neat.StdOutReporter(True))
-        genome_reporter = GenomeReporter()
-        p.add_reporter(genome_reporter)
-        p.add_reporter(
-            neat.Checkpointer(number_generation, filename_prefix=os.path.join(checkpoint_dir_path, "checkpoint-")))
+            print("\n WARNING : CREATING A NEW POPULATION FROM SCRATCH \n")
+            p = Population(neat_config, checkpoint_dir_path)
 
         # Use of a lambda function to be able to give another argument
-        winner = p.run(lambda genomes, conf: eval_genomes(genomes, conf, training_number, training_nets),
-                       number_generation)
-        genome_reporter.print_best_fitnesses(10)
+        p.run(lambda population: eval_genomes(population, training_number, training_nets),
+              number_generation)
 
-        training_genomes = genome_reporter.best_genomes(config.NUMBER_NETS_TRAINING)
+        p.genome_reporter.print_best_fitnesses(10)
+
+        training_genomes = p.genome_reporter.best_genomes(config.NUMBER_NETS_TRAINING)
         training_nets = [neat.nn.FeedForwardNetwork.create(genome, neat_config) for genome in training_genomes]
 
-        # Display the winning genome.
-        # print(f"\nBest genome training {type_training.capitalize()}s n°{(training_number + 1) // 2}: \n {winner}")
-
-        # Saving the winner net for the monster
-        winner_net = neat.nn.FeedForwardNetwork.create(winner, neat_config)
-        with open(f"winner_net_{type_training}.pickle", 'wb') as net_file:
-            pickle.dump(winner_net, net_file)
-
-
-def get_best_genomes(stats, n: int, population):
-    """
-    Return the n bests genomes of the last generation of the training
-    """
-    id_genomes_dict = {}
-    for species_id, genomes_dict in stats.generation_statistics[-1].items():
-        id_genomes_dict.update(genomes_dict)
-    best_genomes_id = dict(sorted(id_genomes_dict.items(), key=lambda item: item[1], reverse=True)[:n])
-    print(f"Best {n} genomes fitness : {list(best_genomes_id.values())}")
-    print(f"Best {n} genomes key : {list(best_genomes_id.keys())}")
-    print([genome.key for genome in list(population.population.values())])
-    return [genome for genome in list(population.population.values()) if genome.key in best_genomes_id]
+        for i, genome in enumerate(training_genomes):
+            p.genome_reporter.draw_net(neat_config, genome, f"network_genome_{i + 1}")
 
 
 if __name__ == '__main__':

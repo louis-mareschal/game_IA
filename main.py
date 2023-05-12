@@ -30,6 +30,7 @@ def eval_genomes(population, training_number: int, training_nets):
     # Updating the generation number
     nets = []
     ge = []
+    mean_fitness_per_episode = [[] for _ in range(len(genomes))]
     display_one_pair = False
     display_best_only = False
 
@@ -40,23 +41,17 @@ def eval_genomes(population, training_number: int, training_nets):
     time_displays = []
 
     for genome_id, genome in genomes:
-        genome.fitness = round(random.random(), 2)
+        genome.fitness = 0
         net = neat.nn.FeedForwardNetwork.create(genome, neat_config)
         nets.append(net)
         ge.append(genome)
-
-    purged_episode = [50]
-    for episode in range(1, 2):  # config.NUMBER_NETS_TRAINING + 1
+    print(f"\nGENERATION {population.generation}\n")
+    end_generation = False
+    for episode in range(1, config.NUMBER_EPISODE + 1):
 
         time_start_episode = time.time()
 
         game = Game(population.generation, training_number, episode)
-        if episode in purged_episode:
-            print(f"PURGING AT EPISODE {episode}")
-            ge, nets = game.purge(ge, nets)
-            if len(ge) != len(nets):
-                print(f"ERROR AFTER PURGE : len(ge)={len(ge)} len(nets)={len(nets)} ")
-                raise ValueError
 
         x_players, y_players = randint(100, config.WINDOW_WIDTH - 100), randint(100, config.WINDOW_HEIGHT - 100)
         x_monsters, y_monsters = randint(100, config.WINDOW_WIDTH - 100), randint(100, config.WINDOW_HEIGHT - 100)
@@ -77,7 +72,7 @@ def eval_genomes(population, training_number: int, training_nets):
         running = True
         paused = False
 
-        im_max = 6000
+        im_max = 5000
         im = 0
 
         time_init.append(time.time() - time_start_episode)
@@ -119,13 +114,58 @@ def eval_genomes(population, training_number: int, training_nets):
 
         time_episodes.append(time.time() - time_start_episode)
 
+        # best_genomes = sorted(genomes, key=lambda g: g[1].fitness, reverse=True)[:10]
+        # best_mean_fitness = [genome.fitness/episode for (genome_id, genome) in best_genomes]
+        # mean_fitness = sum(best_mean_fitness)/10
+        # absolute_deviation = [abs(mean_fitness_genome - mean_fitness) for mean_fitness_genome in best_mean_fitness]
+        # mean_absolute_deviation = sum(absolute_deviation)/10
+        # standard_deviation = [(mean_fitness_genome - mean_fitness)**2 for mean_fitness_genome in best_mean_fitness]
+        # mean_standard_deviation = (sum(standard_deviation) / 10)**0.5
+        # CV_abs = (mean_absolute_deviation/mean_fitness)*100
+        # CV_std = (mean_standard_deviation / mean_fitness) * 100
+        #
+        # print(f"EPISODE {episode} : CV_abs={CV_abs} CV_std={CV_std}")
+
+        for i, (genome_id, genome) in enumerate(genomes):
+            mean_fitness_per_episode[i].append(genome.fitness/episode)
+        if episode > 1:
+            best_10_mean_fitness_per_episode = sorted(mean_fitness_per_episode, key=lambda v: v[-1], reverse=True)[:20]
+            evolution_10_best_mean = sum([abs((1 - fitness_per_episode[-1]/fitness_per_episode[-2])*100) for
+                                          fitness_per_episode in best_10_mean_fitness_per_episode])/20
+            best_20_mean_fitness_per_episode = sorted(mean_fitness_per_episode, key=lambda v: v[-1], reverse=True)[:30]
+            evolution_20_best_mean = sum([abs((1 - fitness_per_episode[-1] / fitness_per_episode[-2]) * 100) for
+                                          fitness_per_episode in best_20_mean_fitness_per_episode]) / 30
+
+            print(f"EPISODE {episode} : Evolution_10_best_mean={round(evolution_10_best_mean)}% "
+                  f"Evolution_20_best_mean={round(evolution_20_best_mean)}%")
+            if evolution_20_best_mean < 15:
+                end_generation = True
+
+        if end_generation:
+            break
+
+
     best_fitness = ge[0].fitness
     best_id = 0
     for i, (genome_id, genome) in enumerate(genomes):
-        genome.fitness /= neat_config.pop_size
+
+        genome.fitness /= config.NUMBER_EPISODE
         if genome.fitness > best_fitness:
             best_fitness = genome.fitness
             best_id = i
+
+    # genomes_list = [(i, genomes[i][1].fitness) for i in range(len(genomes))]
+    # best_genomes_fitness = sorted(genomes_list, key=lambda g: g[1], reverse=True)[:10]
+    # mean_variance = []
+    # best_mean_fitness = []
+    # for (i, fitness) in best_genomes_fitness:
+    #     mean_variance.append(sum([abs(fitness - fitness_episode) for fitness_episode in
+    #                               fitness_per_episode[i]]) / config.NUMBER_EPISODE)
+    #     best_mean_fitness.append(fitness)
+    # print(f"GENERATION {population.generation}")
+    # print(f"Best mean fitness : {best_mean_fitness}")
+    # print(f"Mean absolute deviation: {sum(mean_variance)/10}")
+    # print(f"Mean absolute deviation per genome: {mean_variance}")
 
     # Display the best genome only against all the training nets genomes
     if display_best_only:
@@ -164,6 +204,21 @@ def eval_genomes(population, training_number: int, training_nets):
                     elif event.type == pygame.QUIT:
                         running = False
                         pygame.quit()
+
+    all_fitness = [g.fitness for (_, g) in genomes]
+    fitness_range = max(1.0, max(all_fitness) - min(all_fitness))
+
+    for species in list(population.species.species.values()):
+        mean_fitness_species = sum(species.get_fitnesses())/len(species.members)
+        adjusted_fitness = (mean_fitness_species - min(all_fitness)) / fitness_range
+        print(f"Species {species.key} :")
+        print(f"\tSize : {len(species.members)}")
+        print(f"\tMean fitness: {sum(species.get_fitnesses())/len(species.members)}")
+        print(f"\tAdjusted Fitness : {adjusted_fitness} ")
+        print(f"\tFitnesses : {sorted(species.get_fitnesses(), reverse=True)}")
+        print(f"\tFitness History : {species.fitness_history}")
+        print("\n")
+
 
     # mean_time_episode = sum(time_episodes) / config.NUMBER_EPISODES
     # mean_time_init = sum(time_init) / config.NUMBER_EPISODES
@@ -214,23 +269,31 @@ def run(config_player_path, config_monster_path):
             print("\n WARNING : CREATING A NEW POPULATION FROM SCRATCH \n")
             p = Population(neat_config, checkpoint_dir_path)
 
+        # TO DO :
+        # Adjusted fitness of species: change the way of computing it ?/ change the mean fitness per species ? / print spiecies best genomes
+
+        # Understand stagnation
+
+        # Badant ?
+        #print(p.reproduction.ancestors[1])
+
         # Use of a lambda function to be able to give another argument
         p.run(lambda population: eval_genomes(population, training_number, training_nets),
               number_generation)
 
-        p.genome_reporter.print_best_fitnesses(10)
+        p.genome_reporter.print_best_fitnesses(20)
 
         training_genomes = p.genome_reporter.best_genomes(config.NUMBER_NETS_TRAINING)
         training_nets = [neat.nn.FeedForwardNetwork.create(genome, neat_config) for genome in training_genomes]
 
-        for i, genome in enumerate(training_genomes):
-            p.genome_reporter.draw_net(neat_config, genome, f"network_genome_{i + 1}")
+        #for i, genome in enumerate(training_genomes):
+        #    p.genome_reporter.draw_net(neat_config, genome, f"network_genome_{i + 1}")
 
 
 if __name__ == '__main__':
     os.makedirs("checkpoint_monster", exist_ok=True)
     os.makedirs("checkpoint_player", exist_ok=True)
-
+    random.seed(10)
     config_player_path = os.path.join(os.getcwd(), 'config_player.txt')
     config_monster_path = os.path.join(os.getcwd(), 'config_monster.txt')
     run(config_player_path, config_monster_path)

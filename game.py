@@ -1,6 +1,4 @@
 import pygame
-import sys
-import graphviz
 import config
 
 

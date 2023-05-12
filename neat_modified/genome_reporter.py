@@ -2,11 +2,11 @@
 Better Reporter ever created
 """
 import graphviz
+from tabulate import tabulate
 from neat.math_util import mean, stdev
-from neat.reporting import BaseReporter
 
 
-class GenomeReporter():
+class GenomeReporter:
     """
     Gathers (via the reporting interface) and provides (to callers and/or a file)
     the most-fit genomes and information on genomes fitness.
@@ -20,19 +20,20 @@ class GenomeReporter():
         self.genomes.append(sorted_genomes)
 
     def print_best_fitnesses(self, nb_genomes):
-        print(f"\nTop {nb_genomes} fitness per generation:")
-        score_board = "  MEAN  | " + " | ".join([f"Genome_{i+1}" for i in range(nb_genomes)])
-        print(score_board)
+        table = [["GEN", "MEAN"] + [f"Genome_{i+1}" for i in range(nb_genomes)]]
         for generation, genomes_generation in enumerate(self.genomes):
             fitness_genomes = [round(genome.fitness, 2) for genome in genomes_generation][:nb_genomes]
             mean_fitness_genomes = round(mean(fitness_genomes), 2)
+            table.append([str(generation), str(mean_fitness_genomes)] + [str(fitness) for fitness in fitness_genomes])
+        # Specify the table format (e.g., "plain", "simple", "grid", "fancy_grid", etc.)
+        table_format = "orgtbl"
 
-            len_mean = len(str(mean_fitness_genomes))
-            printing_line = " " + str(mean_fitness_genomes) + " " * (7-len_mean) + "|  "
-            for fitness_genome in fitness_genomes:
-                printing_line += str(fitness_genome) + " " * (8-len(str(fitness_genome))) + "|  "
-            print(printing_line)
-        print("\n")
+        # Generate the table
+        table = tabulate(table, headers="firstrow", tablefmt=table_format, numalign="center")
+
+        # Print the table
+        print(table)
+
 
     def get_fitness_stat(self, f, generation):
         if generation is not None:

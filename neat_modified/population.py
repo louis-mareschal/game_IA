@@ -4,6 +4,7 @@ from neat.math_util import mean
 from .checkpoint_reporter import Checkpointer
 from .genome_reporter import GenomeReporter
 from .reporting import ReporterSet
+import random
 
 
 class CompleteExtinctionException(Exception):
@@ -21,7 +22,7 @@ class Population(object):
     """
 
     def __init__(self, config, checkpoint_dir_path):
-        self.reporters = ReporterSet()  # Unecessary but to avoid modifying every neat file
+        self.reporters = ReporterSet()  # Unnecessary but to avoid modifying every neat file
         self.checkpoint_reporter = Checkpointer(checkpoint_dir_path)
         self.genome_reporter = GenomeReporter()
         self.config = config
@@ -46,7 +47,7 @@ class Population(object):
         self.species = config.species_set_type(config.species_set_config, self.reporters)
         self.generation = 1
         self.species.speciate(config, self.population, self.generation)
-
+        random.seed(10)
 
     def run(self, fitness_function, number_generation):
         """
@@ -70,8 +71,6 @@ class Population(object):
         current_generation = 1
         while current_generation < number_generation+1:
 
-            self.reporters.start_generation(self.generation)
-
             # Evaluate all genomes using the user-provided function.
             fitness_function(self)
 
@@ -80,11 +79,12 @@ class Population(object):
                     raise RuntimeError("Fitness not assigned to genome {}".format(g.key))
 
             if not (current_generation == 1 and self.generation != current_generation):
-                self.checkpoint_reporter.end_generation(self)
+                self.genome_reporter.end_generation(self.population.values())
                 if current_generation == number_generation:
                     self.checkpoint_reporter.save_checkpoint(self)
                 else:
-                    self.genome_reporter.end_generation(self.population.values())
+                    self.checkpoint_reporter.end_generation(self)
+
 
 
 

@@ -22,29 +22,34 @@ class Population(object):
     """
 
     def __init__(self, config, checkpoint_dir_path):
-        self.reporters = ReporterSet()  # Unnecessary but to avoid modifying every neat file
+        self.reporters = (
+            ReporterSet()
+        )  # Unnecessary but to avoid modifying every neat file
         self.checkpoint_reporter = Checkpointer(checkpoint_dir_path)
         self.genome_reporter = GenomeReporter()
         self.config = config
         stagnation = config.stagnation_type(config.stagnation_config, self.reporters)
-        self.reproduction = config.reproduction_type(config.reproduction_config,
-                                                     self.reporters,
-                                                     stagnation)
-        if config.fitness_criterion == 'max':
+        self.reproduction = config.reproduction_type(
+            config.reproduction_config, self.reporters, stagnation
+        )
+        if config.fitness_criterion == "max":
             self.fitness_criterion = max
-        elif config.fitness_criterion == 'min':
+        elif config.fitness_criterion == "min":
             self.fitness_criterion = min
-        elif config.fitness_criterion == 'mean':
+        elif config.fitness_criterion == "mean":
             self.fitness_criterion = mean
         elif not config.no_fitness_termination:
             raise RuntimeError(
-                "Unexpected fitness_criterion: {0!r}".format(config.fitness_criterion))
+                "Unexpected fitness_criterion: {0!r}".format(config.fitness_criterion)
+            )
 
         # Create a population from scratch, then partition into species.
-        self.population = self.reproduction.create_new(config.genome_type,
-                                                       config.genome_config,
-                                                       config.pop_size)
-        self.species = config.species_set_type(config.species_set_config, self.reporters)
+        self.population = self.reproduction.create_new(
+            config.genome_type, config.genome_config, config.pop_size
+        )
+        self.species = config.species_set_type(
+            config.species_set_config, self.reporters
+        )
         self.generation = 1
         self.species.speciate(config, self.population, self.generation)
         random.seed(10)
@@ -69,28 +74,20 @@ class Population(object):
         """
 
         current_generation = 1
-        while current_generation < number_generation+1:
-
+        while current_generation < number_generation + 1:
             # Evaluate all genomes using the user-provided function.
             fitness_function(self)
 
             for g in self.population.values():
                 if g.fitness is None:
-                    raise RuntimeError("Fitness not assigned to genome {}".format(g.key))
-
-            if not (current_generation == 1 and self.generation != current_generation):
-                self.genome_reporter.end_generation(self.population.values())
-                if current_generation == number_generation:
-                    self.checkpoint_reporter.save_checkpoint(self)
-                else:
-                    self.checkpoint_reporter.end_generation(self)
-
-
-
+                    raise RuntimeError(
+                        "Fitness not assigned to genome {}".format(g.key)
+                    )
 
             # Create the next generation from the current generation.
-            self.population = self.reproduction.reproduce(self.config, self.species,
-                                                          self.config.pop_size, self.generation)
+            self.population = self.reproduction.reproduce(
+                self.config, self.species, self.config.pop_size, self.generation
+            )
 
             # Check for complete extinction.
             if not self.species.species:
@@ -101,3 +98,10 @@ class Population(object):
 
             current_generation += 1
             self.generation += 1
+
+            if current_generation == number_generation + 1:
+                self.checkpoint_reporter.save_checkpoint(self)
+            else:
+                self.checkpoint_reporter.end_generation(self)
+
+

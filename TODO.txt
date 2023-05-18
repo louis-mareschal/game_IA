@@ -1,0 +1,15 @@
+# Adjusted fitness of species:
+change the way of computing it ?
+change the mean fitness per species ?
+print species best genomes
+
+# Understand stagnation
+
+# Understand how reproduction between 2 genomes works
+
+# Possibility of printing the evolution of a genome
+print(p.reproduction.ancestors)
+
+# Adapt the number of steps between each display based on the speed of the last update
+
+# For the demo, print the live neurol network

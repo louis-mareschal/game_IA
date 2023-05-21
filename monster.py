@@ -1,3 +1,4 @@
+import numpy as np
 import pygame
 import typing
 import config
@@ -13,7 +14,7 @@ class Monster(pygame.sprite.Sprite):
         self.pos = pygame.math.Vector2(x, y)
         self.rect = self.image.get_rect(topleft=self.pos)
         self.speed = config.SPEED
-        self.diagonal_speed = self.speed / 2**0.5
+        self.diagonal_speed = self.speed / 2 ** 0.5
         self.net_monster = None
         self.life = config.MONSTER_LIFE
 
@@ -22,101 +23,113 @@ class Monster(pygame.sprite.Sprite):
 
     def check_hit_wall(self):
         if (
-            self.rect.top <= 0
-            or self.rect.bottom >= config.WINDOW_HEIGHT
-            or self.rect.left <= 0
-            or self.rect.right >= config.WINDOW_WIDTH
+                self.rect.top <= config.WINDOW_STATS_HEIGHT
+                or self.rect.bottom >= config.WINDOW_HEIGHT
+                or self.rect.left <= 0
+                or self.rect.right >= config.WINDOW_WIDTH
         ):
             self.life -= 1
 
-    def get_next_move(self, player_x, player_y):
-        return self.net_monster.activate(
-            [
-                player_y / config.WINDOW_HEIGHT,
-                self.rect.y / config.WINDOW_HEIGHT,
-                player_x / config.WINDOW_WIDTH,
-                self.rect.x / config.WINDOW_WIDTH,
-            ]
-        )
+    def get_next_move(self, player, grid):
+        return self.net_monster.activate(self.get_local_view(player, grid).flatten())
 
     def move(self, next_move_monster: typing.List[float]):
-        down = next_move_monster[0] > 5 / 10
-        up = next_move_monster[0] < 5 / 10
-        right = next_move_monster[1] > 5 / 10
-        left = next_move_monster[1] < 5 / 10
-
-        if up and not (right or left):
-            if (
-                self.rect.top > 0
-            ):  # check if the monster is within the top screen boundary
+        match np.argmax(next_move_monster):
+            case 0:
                 self.move_up()
-        elif down and not (right or left):
-            if (
-                self.rect.bottom < config.WINDOW_HEIGHT
-            ):  # check if the monster is within the bottom screen boundary
+            case 1:
                 self.move_down()
-        elif left and not (up or down):
-            if (
-                self.rect.left > 0
-            ):  # check if the monster is within the left screen boundary
+            case 2:
                 self.move_left()
-        elif right and not (up or down):
-            if (
-                self.rect.right < config.WINDOW_WIDTH
-            ):  # check if the monster is within the right screen boundary
+            case 3:
                 self.move_right()
-        elif up and left:
-            # check if the monster is within the top and left screen boundaries
-            if self.rect.top > 0 and self.rect.left > 0:
+            case 4:
                 self.move_up_left()
-        elif up and right:
-            # check if the monster is within the top and right screen boundaries
-            if self.rect.top > 0 and self.rect.right < config.WINDOW_WIDTH:
+            case 5:
                 self.move_up_right()
-        elif down and left:
-            # check if the monster is within the bottom and left screen boundaries
-            if self.rect.bottom < config.WINDOW_HEIGHT and self.rect.left > 0:
+            case 6:
                 self.move_down_left()
-        elif down and right:
-            # check if the monster is within the bottom and right screen boundaries
-            if (
-                self.rect.bottom < config.WINDOW_HEIGHT
-                and self.rect.right < config.WINDOW_WIDTH
-            ):
+            case 7:
                 self.move_down_right()
 
     def move_up(self):
-        self.pos.y -= self.speed
-        self.rect.topleft = round(self.pos.x), round(self.pos.y)
+        if self.rect.top > config.WINDOW_STATS_HEIGHT:
+            self.pos.y -= self.speed
+            self.rect.topleft = round(self.pos.x), round(self.pos.y)
 
     def move_down(self):
-        self.pos.y += self.speed
-        self.rect.topleft = round(self.pos.x), round(self.pos.y)
+        if self.rect.bottom < config.WINDOW_HEIGHT:
+            self.pos.y += self.speed
+            self.rect.topleft = round(self.pos.x), round(self.pos.y)
 
     def move_left(self):
-        self.pos.x -= self.speed
-        self.rect.topleft = round(self.pos.x), round(self.pos.y)
+        if self.rect.left > 0:
+            self.pos.x -= self.speed
+            self.rect.topleft = round(self.pos.x), round(self.pos.y)
 
     def move_right(self):
-        self.pos.x += self.speed
-        self.rect.topleft = round(self.pos.x), round(self.pos.y)
+        if self.rect.right < config.WINDOW_WIDTH:
+            self.pos.x += self.speed
+            self.rect.topleft = round(self.pos.x), round(self.pos.y)
 
     def move_up_left(self):
-        self.pos.x -= self.diagonal_speed
-        self.pos.y -= self.diagonal_speed
-        self.rect.topleft = round(self.pos.x), round(self.pos.y)
+        if self.rect.top > config.WINDOW_STATS_HEIGHT and self.rect.left > 0:
+            self.pos.x -= self.diagonal_speed
+            self.pos.y -= self.diagonal_speed
+            self.rect.topleft = round(self.pos.x), round(self.pos.y)
+        elif self.rect.top > config.WINDOW_STATS_HEIGHT:
+            self.move_up()
+        elif self.rect.left > 0:
+            self.move_left()
 
     def move_up_right(self):
-        self.pos.x += self.diagonal_speed
-        self.pos.y -= self.diagonal_speed
-        self.rect.topleft = round(self.pos.x), round(self.pos.y)
+        if self.rect.top > config.WINDOW_STATS_HEIGHT and self.rect.right < config.WINDOW_WIDTH:
+            self.pos.x += self.diagonal_speed
+            self.pos.y -= self.diagonal_speed
+            self.rect.topleft = round(self.pos.x), round(self.pos.y)
+        elif self.rect.top > config.WINDOW_STATS_HEIGHT:
+            self.move_up()
+        elif self.rect.right < config.WINDOW_WIDTH:
+            self.move_right()
 
     def move_down_left(self):
-        self.pos.x -= self.diagonal_speed
-        self.pos.y += self.diagonal_speed
-        self.rect.topleft = round(self.pos.x), round(self.pos.y)
+        if self.rect.bottom < config.WINDOW_HEIGHT and self.rect.left > 0:
+            self.pos.x -= self.diagonal_speed
+            self.pos.y += self.diagonal_speed
+            self.rect.topleft = round(self.pos.x), round(self.pos.y)
+        elif self.rect.bottom < config.WINDOW_HEIGHT:
+            self.move_down()
+        elif self.rect.left > 0:
+            self.move_left()
 
     def move_down_right(self):
-        self.pos.x += self.diagonal_speed
-        self.pos.y += self.diagonal_speed
-        self.rect.topleft = round(self.pos.x), round(self.pos.y)
+        if self.rect.bottom < config.WINDOW_HEIGHT and self.rect.right < config.WINDOW_WIDTH:
+            self.pos.x += self.diagonal_speed
+            self.pos.y += self.diagonal_speed
+            self.rect.topleft = round(self.pos.x), round(self.pos.y)
+        elif self.rect.bottom < config.WINDOW_HEIGHT:
+            self.move_down()
+        elif self.rect.right < config.WINDOW_WIDTH:
+            self.move_right()
+
+    def get_local_view(self, player, empty_grid):
+        grid = np.array(empty_grid)
+        grid[(player.rect.centery - config.WINDOW_STATS_HEIGHT) // config.IMAGE_SIZE[0] + 1, player.rect.centerx //
+             config.IMAGE_SIZE[0] + 1] = 1
+        grid_size = grid.shape[0]
+        local_view_size = 7
+        half_local_view = local_view_size // 2
+
+        local_view = np.zeros((local_view_size, local_view_size), dtype=int)
+
+        line_monster = (self.rect.centery - config.WINDOW_STATS_HEIGHT) // config.IMAGE_SIZE[0] + 1
+        column_monster = self.rect.centerx // config.IMAGE_SIZE[0] + 1
+        for line in range(-half_local_view, half_local_view + 1):
+            for column in range(-half_local_view, half_local_view + 1):
+                column_grid = column_monster + column
+                line_grid = line_monster + line
+
+                if column_grid >= 0 and column_grid < grid_size and line_grid >= 0 and line_grid < grid_size:
+                    local_view[line + half_local_view, column + half_local_view] = grid[column_grid, line_grid]
+
+        return local_view

@@ -3,6 +3,7 @@ import pygame
 import random
 from random import randint
 import typing
+import numpy as np
 
 import neat
 from neat_modified.population import Population
@@ -11,7 +12,7 @@ from neat_modified.checkpoint_reporter import Checkpointer
 from game import Game
 from monster import Monster
 from player import Player
-from deno_game import DemoGame
+from demo_game import DemoGame
 import config
 
 
@@ -43,11 +44,7 @@ def eval_genomes(population: Population, training_number: int, training_nets: ty
         nets.append(net)
         ge.append(genome)
 
-    nb_episode = config.MAX_NUMBER_EPISODE
-
     # Initialization : display
-    display_one_pair = False
-    display_best_only = False
     print(f"\nGENERATION {population.generation}\n")
 
     # Initialization : stats
@@ -58,17 +55,20 @@ def eval_genomes(population: Population, training_number: int, training_nets: ty
     for episode in range(1, config.MAX_NUMBER_EPISODE + 1):
         population.genome_reporter.start_episode()
 
-        game = Game(population.generation, training_number, episode)
+        game = Game(population.generation, training_number, episode, len(ge))
 
-        x_players, y_players = randint(100, config.WINDOW_WIDTH - 100), randint(100, config.WINDOW_HEIGHT - 100)
-        x_monsters, y_monsters = randint(100, config.WINDOW_WIDTH - 100), randint(100, config.WINDOW_HEIGHT - 100)
+        x_player = config.IMAGE_SIZE[0] * 3 #randint(0, config.WINDOW_WIDTH - config.IMAGE_SIZE[0])
+        y_player = config.WINDOW_STATS_HEIGHT + config.IMAGE_SIZE[0] * 3 #randint(config.WINDOW_STATS_HEIGHT, config.WINDOW_HEIGHT - config.IMAGE_SIZE[0])
+        x_monsters = config.IMAGE_SIZE[0] #randint(0, config.WINDOW_WIDTH - config.IMAGE_SIZE[0])
+        y_monsters = config.WINDOW_STATS_HEIGHT + config.IMAGE_SIZE[0] #randint(config.WINDOW_STATS_HEIGHT, config.WINDOW_HEIGHT - config.IMAGE_SIZE[0])
+        player = Player(x_player, y_player, len(ge))
+        game.add_player(player)
+
         for index_entity in range(len(ge)):
             # Creating the monsters
             monster = Monster(x_monsters, y_monsters, index_entity)
             game.add_monster(monster)
-            # Creating the players
-            player = Player(x_players, y_players, index_entity)
-            game.add_player(player)
+
             # Adding the training nets from the last training (if any)
             if training_nets:
                 if training_number % 2:
@@ -77,75 +77,32 @@ def eval_genomes(population: Population, training_number: int, training_nets: ty
                     monster.set_net(
                         training_nets[episode % config.NUMBER_NETS_TRAINING]
                     )
-
+        population.genome_reporter.set_init_time_episode()
         ge, nets, population = game.run_episode(nets, ge, population, pygame.display.get_surface())
-        population.genome_reporter.end_episode(ge)
-        # best_genomes = sorted(genomes, key=lambda g: g[1].fitness, reverse=True)[:10]
-        # best_mean_fitness = [genome.fitness/episode for (genome_id, genome) in best_genomes]
-        # mean_fitness = sum(best_mean_fitness)/10
-        # absolute_deviation = [abs(mean_fitness_genome - mean_fitness) for mean_fitness_genome in best_mean_fitness]
-        # mean_absolute_deviation = sum(absolute_deviation)/10
-        # standard_deviation = [(mean_fitness_genome - mean_fitness)**2 for mean_fitness_genome in best_mean_fitness]
-        # mean_standard_deviation = (sum(standard_deviation) / 10)**0.5
-        # CV_abs = (mean_absolute_deviation/mean_fitness)*100
-        # CV_std = (mean_standard_deviation / mean_fitness) * 100
-        #
-        # print(f"EPISODE {episode} : CV_abs={CV_abs} CV_std={CV_std}")
 
-        if episode > 1 and population.genome_reporter.compute_evolution_best_mean() < config.THRESHOLD_EVOL_MEAN_FITNESS:
+        population.genome_reporter.end_episode(genomes)
+
+        if episode > 1 and population.genome_reporter.compute_evolution_ranking(
+                genomes) < config.THRESHOLD_EVOL_RANKING:
             break
-
-    # genomes_list = [(i, genomes[i][1].fitness) for i in range(len(genomes))]
-    # best_genomes_fitness = sorted(genomes_list, key=lambda g: g[1], reverse=True)[:10]
-    # mean_variance = []
-    # best_mean_fitness = []
-    # for (i, fitness) in best_genomes_fitness:
-    #     mean_variance.append(sum([abs(fitness - fitness_episode) for fitness_episode in
-    #                               fitness_per_episode[i]]) / config.MAX_NUMBER_EPISODE)
-    #     best_mean_fitness.append(fitness)
-    # print(f"GENERATION {population.generation}")
-    # print(f"Best mean fitness : {best_mean_fitness}")
-    # print(f"Mean absolute deviation: {sum(mean_variance)/10}")
-    # print(f"Mean absolute deviation per genome: {mean_variance}")
+        population.genome_reporter.ranking_id_last_episode = np.array(sorted(genomes, key=lambda g: g[1].fitness,
+                                                                             reverse=True)[:20])[:, 0]
 
     # Taking the mean of the fitnesses
-    print(population.genome_reporter.current_episode)
     for _, genome in genomes:
         genome.fitness /= population.genome_reporter.current_episode
-
-    population.genome_reporter.print_species_stats(list(population.species.species.values()))
 
     # End of the generation
     population.genome_reporter.end_generation(population.population.values())
 
     # Display a demo of the best genome of this generation
-    DemoGame(population.genome_reporter.best_genomes(1, False)[0], neat_config, population.generation).show_demo(1)
+    # DemoGame(population.genome_reporter.best_genomes(1, False)[0], neat_config, population.generation).show_demo(1)
 
-
-    # # Plot settings
-    # nb_plots = np.array(all_fitness_per_episode).shape[1] + 1
-    # num_rows = int(np.ceil(np.sqrt(nb_plots)))
-    # num_cols = int(np.ceil(nb_plots / num_rows))
-    #
-    # fig, axs = plt.subplots(num_rows, num_cols, figsize=(12, 8), squeeze=False)
-    # for i, ax in enumerate(axs.flat):
-    #     if i < nb_plots - 1:
-    #         ax.hist(np.array(all_fitness_per_episode)[:, i], bins=30)
-    #         ax.set_title(f"Episode {i + 1}")
-    #     elif i == nb_plots - 1:
-    #         ax.hist(all_fitness, bins=30)
-    #     else:
-    #         fig.delaxes(ax)  # Remove empty subplots if there are more than needed
-    #
-    # # Adjust spacing between subplots
-    # plt.tight_layout()
-
-    # Show the figure
-    # plt.show()
-
-    # ax.set_xlabel('Fitness')
-    # ax.set_ylabel('Frequency')
-    # ax.set_title(f'Ftiness Repartition Generation {population.generation}')
+    # Print stats
+    population.genome_reporter.get_generation_stats()
+    population.genome_reporter.print_species_stats(list(population.species.species.values()))
+    # population.genome_reporter.plot_fitness_repartition()
+    # population.genome_reporter.print_time_stats()
 
 
 def run(_config_player_path: str, _config_monster_path: str):
@@ -202,15 +159,18 @@ def run(_config_player_path: str, _config_monster_path: str):
 
         # RUN THE TRAINING
         # Use of a lambda function to be able to give additional arguments
-        p.run(
-            lambda population: eval_genomes(population, training_number, training_nets),
-            number_generation,
-        )
+        # p.run(
+        #     lambda population: eval_genomes(population, training_number, training_nets),
+        #     number_generation,
+        # )
 
         # Stats
         p.genome_reporter.print_best_fitnesses(20)
         training_genomes = p.genome_reporter.best_genomes(config.NUMBER_NETS_TRAINING)
+
         for i, genome in enumerate(training_genomes):
+            DemoGame(genome, neat_config,
+                     p.generation).show_demo(3)
             p.genome_reporter.draw_net(neat_config, genome, f"network_genome_{i + 1}")
 
         # Saving the best nets for the alternative training

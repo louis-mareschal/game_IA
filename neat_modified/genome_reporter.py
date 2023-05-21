@@ -2,13 +2,14 @@
 Better Reporter ever created
 """
 import time
-
 import graphviz
 from tabulate import tabulate
 from dataclasses import dataclass, field
 from neat.math_util import mean, stdev
 import numpy as np
 from typing import List
+import matplotlib.pyplot as plt
+
 import config
 
 
@@ -38,6 +39,9 @@ class GenomeReporter:
         self.current_generation = 0
         self.current_episode = 0
 
+        # Parameters to know when to end a generation
+        self.ranking_id_last_episode = None
+
     def start_generation(self):
         self.current_generation += 1
         self.all_fitnesses.append([])
@@ -59,13 +63,13 @@ class GenomeReporter:
     def end_episode(self, genomes):
         # Time stats
         self.time_generations[-1][0].append(self.stats_time_episode.end_time_init)
-        self.time_generations[-1][1].append(mean(self.stats_time_episode.update_time_steps))
-        self.time_generations[-1][2].append(mean(self.stats_time_episode.display_time_steps))
+        self.time_generations[-1][1].append(sum(self.stats_time_episode.update_time_steps))
+        self.time_generations[-1][2].append(sum(self.stats_time_episode.display_time_steps))
         self.stats_time_episode = StatsTimeEpisode()
         # Fitness stats
         sum_fitness_episode = np.sum(self.all_fitnesses[-1], axis=0)
         self.all_fitnesses[-1].append([])
-        for i, genome in enumerate(genomes):
+        for i, (genome_id, genome) in enumerate(genomes):
             if self.current_episode > 1:
                 self.all_fitnesses[-1][-1].append(genome.fitness - sum_fitness_episode[i])
             else:
@@ -81,27 +85,27 @@ class GenomeReporter:
         self.stats_time_episode.update_time_steps.append(time.time() - self.stats_time_episode.start_time_step)
 
     def set_display_time_step(self):
-        self.stats_time_episode.display_time_steps.append(time.time() - self.stats_time_episode.update_time_steps[-1])
+        self.stats_time_episode.display_time_steps.append((time.time() - self.stats_time_episode.start_time_step) -
+                                                          self.stats_time_episode.update_time_steps[-1])
 
     def print_time_stats(self):
         np_time_generations_per_episode = np.sum(np.transpose(np.array(self.time_generations), (0, 2, 1)), axis=2)
         mean_time_episode_per_generation = np.mean(np_time_generations_per_episode, axis=1)
-
-        mean_time_init_per_generation = np.mean(np_time_generations_per_episode[:, 0], axis=1)
-        mean_time_update_per_generation = np.mean(np_time_generations_per_episode[:, 1], axis=1)
-        mean_time_display_per_generation = np.mean(np_time_generations_per_episode[:, 2], axis=1)
+        mean_time_init_per_generation = np.mean(np.array(self.time_generations)[:, 0], axis=1)
+        mean_time_update_per_generation = np.mean(np.array(self.time_generations)[:, 1], axis=1)
+        mean_time_display_per_generation = np.mean(np.array(self.time_generations)[:, 2], axis=1)
 
         print(f"TIME REPORT TRAINING PER GENERATION\n")
         print(f"Mean time episodes: {np.round(mean_time_episode_per_generation, 2)}")
         print(
             f"Mean time init section during episodes : {np.round(mean_time_init_per_generation, 2)} "
-            f"{int(100 * mean_time_init_per_generation / mean_time_episode_per_generation)}% ")
+            f"{(100 * mean_time_init_per_generation / mean_time_episode_per_generation).astype(int)}% ")
         print(
             f"Mean time update section during episodes : {np.round(mean_time_update_per_generation, 2)} "
-            f"{int(100 * mean_time_update_per_generation / mean_time_episode_per_generation)}%")
+            f"{(100 * mean_time_update_per_generation / mean_time_episode_per_generation).astype(int)}%")
         print(
             f"Mean time display during episodes : {np.round(mean_time_display_per_generation, 2)} "
-            f"{int(100 * mean_time_display_per_generation / mean_time_episode_per_generation)}%")
+            f"{(100 * mean_time_display_per_generation / mean_time_episode_per_generation).astype(int)}%")
         print("\n")
 
     def print_best_fitnesses(self, nb_genomes):
@@ -126,15 +130,20 @@ class GenomeReporter:
         # Print the table
         print(table)
 
-    def compute_evolution_best_mean(self):
-        nb_fitness = config.NUMBER_BEST_FITNESS_EVOL_MEAN
-        best_mean_fit_last_ep = sorted(np.mean(self.all_fitnesses[-1], axis=0) + 1, reverse=True)[:nb_fitness]
-        best_mean_fit_before_last_ep = sorted(np.mean(self.all_fitnesses[-1][:-1], axis=0) + 1, reverse=True)[:nb_fitness]
-        evolution_best_mean = mean(
-            abs(1 - np.array(best_mean_fit_last_ep) / np.array(best_mean_fit_before_last_ep)) * 100)
+    def compute_evolution_ranking(self, genomes):
+        ranking_id_current_episode = np.array(sorted(genomes, key=lambda g: g[1].fitness, reverse=True))[:, 0]
+        total_rank_changes = 0
+        total_rank_changes_top = 0
+        for i, genome_id in enumerate(self.ranking_id_last_episode):
+            if genome_id not in ranking_id_current_episode[:20]:
+                total_rank_changes_top += 1
+            for j, current_genome_id in enumerate(ranking_id_current_episode):
+                if genome_id == current_genome_id:
+                    total_rank_changes += abs(i - j)
+                    break
         print(
-            f"EPISODE {self.current_episode}: Evolution {nb_fitness} best genomes mean={round(evolution_best_mean, 2)}%")
-        return evolution_best_mean
+            f"EPISODE {self.current_episode}: Total rank changes of the 20 best genomes= {total_rank_changes} {total_rank_changes_top}")
+        return total_rank_changes
 
     def print_species_stats(self, species_values):
         all_fitness = np.mean(self.all_fitnesses[-1], axis=0)
@@ -149,6 +158,38 @@ class GenomeReporter:
             print(f"\tAdjusted Fitness : {adjusted_fitness} ")
             print(f"\tFitnesses : {sorted(species.get_fitnesses(), reverse=True)}")
             print("\n")
+
+    def plot_fitness_repartition(self):
+        nb_plots = self.current_generation + 1
+
+        fig, ax = plt.subplots(figsize=(12, 8))
+
+        colors = ['b', 'g', 'c', 'm', 'y', 'orange', 'purple', 'brown', 'pink', 'olive']
+
+        for i in range(nb_plots - 1):
+            ax.hist(self.all_fitnesses[-1][i], bins=30, color=colors[i], alpha=0.5, label=f"Episode {i + 1}")
+
+        ax.hist(np.mean(self.all_fitnesses[-1], axis=0), bins=30, color='red', alpha=0.7, label='MEAN')
+
+        ax.set_xlabel('Fitness')
+        ax.set_ylabel('Frequency')
+        ax.set_title(f'Fitness Repartition Generation {len(self.genomes)}')
+        ax.legend()
+
+        plt.show()
+
+    def get_generation_stats(self):
+
+        best_mean_fitness = sorted(np.mean(self.all_fitnesses[-1], axis=0), reverse=True)[:10]
+        mean_fitness = round(mean(best_mean_fitness), 2)
+        absolute_deviation = [abs(mean_fitness_genome - mean_fitness) for mean_fitness_genome in best_mean_fitness]
+        mean_absolute_deviation = round(mean(absolute_deviation), 2)
+        standard_deviation = [(mean_fitness_genome - mean_fitness) ** 2 for mean_fitness_genome in best_mean_fitness]
+        mean_standard_deviation = round((sum(standard_deviation) / 10) ** 0.5, 2)
+
+        print(f"GENERATION {self.current_generation} :")
+        print(f"Mean 10 best fitnesses = {mean_fitness}")
+        print(f"Mean abs dev = {mean_absolute_deviation} | Mean std dev = {mean_standard_deviation}")
 
     def get_fitness_stat(self, f, generation):
         if generation is not None:
@@ -199,8 +240,15 @@ class GenomeReporter:
                 -2: "monster_y",
                 -3: "player_x",
                 -4: "monster_x",
-                0: "up_down",
-                1: "left_right",
+                0: "up",
+                1: "down",
+                2: "left",
+                3: "right",
+                4: "up_left",
+                5: "up_right",
+                6: "down_left",
+                7: "down_right",
+
             }
 
         assert type(node_names) is dict

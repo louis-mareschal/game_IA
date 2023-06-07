@@ -8,6 +8,8 @@ import numpy as np
 import neat
 from neat_modified.population import Population
 from neat_modified.checkpoint_reporter import Checkpointer
+from neat_modified.feed_forward import FeedForwardNetwork
+
 
 from game import Game
 from monster import Monster
@@ -16,7 +18,7 @@ from demo_game import DemoGame
 import config
 
 
-def eval_genomes(population: Population, training_number: int, training_nets: typing.List[neat.nn.FeedForwardNetwork]):
+def eval_genomes(population: Population, training_number: int, training_nets: typing.List[FeedForwardNetwork]):
     """
     The function runs a simulation with the current population of monsters or players and evaluates their fitness based
     on the number of collisions they have with their opponents.
@@ -40,7 +42,7 @@ def eval_genomes(population: Population, training_number: int, training_nets: ty
 
     for genome_id, genome in genomes:
         genome.fitness = 0
-        net = neat.nn.FeedForwardNetwork.create(genome, neat_config)
+        net = FeedForwardNetwork.create(genome, neat_config)
         nets.append(net)
         ge.append(genome)
 
@@ -57,8 +59,8 @@ def eval_genomes(population: Population, training_number: int, training_nets: ty
 
         game = Game(population.generation, training_number, episode, len(ge))
 
-        x_player = config.IMAGE_SIZE[0] * 3 #randint(0, config.WINDOW_WIDTH - config.IMAGE_SIZE[0])
-        y_player = config.WINDOW_STATS_HEIGHT + config.IMAGE_SIZE[0] * 3 #randint(config.WINDOW_STATS_HEIGHT, config.WINDOW_HEIGHT - config.IMAGE_SIZE[0])
+        x_player = config.IMAGE_SIZE[0] * 0 #randint(0, config.WINDOW_WIDTH - config.IMAGE_SIZE[0])
+        y_player = config.WINDOW_STATS_HEIGHT + config.IMAGE_SIZE[0] * 0 #randint(config.WINDOW_STATS_HEIGHT, config.WINDOW_HEIGHT - config.IMAGE_SIZE[0])
         x_monsters = config.IMAGE_SIZE[0] #randint(0, config.WINDOW_WIDTH - config.IMAGE_SIZE[0])
         y_monsters = config.WINDOW_STATS_HEIGHT + config.IMAGE_SIZE[0] #randint(config.WINDOW_STATS_HEIGHT, config.WINDOW_HEIGHT - config.IMAGE_SIZE[0])
         player = Player(x_player, y_player, len(ge))
@@ -159,10 +161,10 @@ def run(_config_player_path: str, _config_monster_path: str):
 
         # RUN THE TRAINING
         # Use of a lambda function to be able to give additional arguments
-        # p.run(
-        #     lambda population: eval_genomes(population, training_number, training_nets),
-        #     number_generation,
-        # )
+        p.run(
+              lambda population: eval_genomes(population, training_number, training_nets),
+              number_generation,
+        )
 
         # Stats
         p.genome_reporter.print_best_fitnesses(20)
@@ -175,7 +177,7 @@ def run(_config_player_path: str, _config_monster_path: str):
 
         # Saving the best nets for the alternative training
         training_nets = [
-            neat.nn.FeedForwardNetwork.create(genome, neat_config)
+            FeedForwardNetwork.create(genome, neat_config)
             for genome in training_genomes
         ]
 

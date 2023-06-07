@@ -1,4 +1,4 @@
-import neat
+from neat_modified.feed_forward import FeedForwardNetwork
 from random import randint
 import pygame
 import numpy as np
@@ -14,7 +14,7 @@ class DemoGame:
         self.generation = generation
         self.genome_monster = genome_monster
         self.neat_config_monster = neat_config_monster
-        self.net_monster = neat.nn.FeedForwardNetwork.create(self.genome_monster, neat_config_monster)
+        self.net_monster = FeedForwardNetwork.create(self.genome_monster, neat_config_monster)
         self.monster = None
         self.player = None
         self.fitness_demo = None
@@ -28,7 +28,7 @@ class DemoGame:
 
         # Pygame initialization
         self.background = pygame.image.load(config.IMAGE_BACKGROUND_PATH)
-        self.font = pygame.font.Font(pygame.font.get_default_font(), 20)
+        self.font = pygame.font.Font(pygame.font.get_default_font(), 10)
         self.backup_caption = pygame.display.get_caption()[0]
         pygame.display.set_caption(
             "DEMO : AI alternative reinforcement training using genetic algorithm"

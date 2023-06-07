@@ -14,12 +14,10 @@ class Game:
         self.player_killed = 0
         self.monster_removed = 0
 
-        self.grid = np.zeros((12, 12), dtype=int)
-        # Set walls on the borders
-        self.grid[0, :] = -1
-        self.grid[-1, :] = -1
-        self.grid[:, 0] = -1
-        self.grid[:, -1] = -1
+        n = 5
+        self.grid = np.zeros((n + 2 * (n-1), n + 2 * (n-1)), dtype=int)
+        self.grid[n-2: -n+2, n-2: -n+2] = -1
+        self.grid[n-1: -n+1, n-1: -n+1] = 0
 
         self.all_monsters = pygame.sprite.Group()
         self.pop_size = pop_size
@@ -27,7 +25,7 @@ class Game:
         self.all_players = pygame.sprite.Group()
         self.all_players_alive = pygame.sprite.Group()
         self.background = pygame.image.load(config.IMAGE_BACKGROUND_PATH)
-        self.font = pygame.font.Font(pygame.font.get_default_font(), 20)
+        self.font = pygame.font.Font(pygame.font.get_default_font(), 10)
 
     def add_monster(self, monster):
         self.all_monsters.add(monster)
@@ -84,7 +82,7 @@ class Game:
         self.player.move_random()
         for monster in self.all_monsters:
             next_move_monster = nets[monster.id].activate(
-                monster.get_local_view(self.player, self.grid).flatten()
+                monster.get_local_view_optimized(self.player, self.grid).flatten()
             )
 
             # next_move_monster = nets[monster.id].activate(

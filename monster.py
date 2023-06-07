@@ -112,24 +112,23 @@ class Monster(pygame.sprite.Sprite):
         elif self.rect.right < config.WINDOW_WIDTH:
             self.move_right()
 
-    def get_local_view(self, player, empty_grid):
+    def get_local_view_optimized(self, player, empty_grid):
         grid = np.array(empty_grid)
-        grid[(player.rect.centery - config.WINDOW_STATS_HEIGHT) // config.IMAGE_SIZE[0] + 1, player.rect.centerx //
-             config.IMAGE_SIZE[0] + 1] = 1
-        grid_size = grid.shape[0]
-        local_view_size = 7
-        half_local_view = local_view_size // 2
+        size_grid = (grid.shape[0] + 2) // 3
+        center_y = (player.rect.centery - config.WINDOW_STATS_HEIGHT) // config.IMAGE_SIZE[0] + size_grid - 1
+        center_x = player.rect.centerx // config.IMAGE_SIZE[0] + size_grid - 1
+        grid[center_y, center_x] = 1
 
-        local_view = np.zeros((local_view_size, local_view_size), dtype=int)
+        local_view_size = size_grid*2
+        half_local_view = size_grid
 
-        line_monster = (self.rect.centery - config.WINDOW_STATS_HEIGHT) // config.IMAGE_SIZE[0] + 1
-        column_monster = self.rect.centerx // config.IMAGE_SIZE[0] + 1
-        for line in range(-half_local_view, half_local_view + 1):
-            for column in range(-half_local_view, half_local_view + 1):
-                column_grid = column_monster + column
-                line_grid = line_monster + line
+        line_monster = (self.rect.centery - config.WINDOW_STATS_HEIGHT) // config.IMAGE_SIZE[0] + size_grid - 1
+        column_monster = self.rect.centerx // config.IMAGE_SIZE[0] + size_grid - 1
 
-                if column_grid >= 0 and column_grid < grid_size and line_grid >= 0 and line_grid < grid_size:
-                    local_view[line + half_local_view, column + half_local_view] = grid[column_grid, line_grid]
+        start_line, end_line = line_monster - half_local_view, line_monster + half_local_view + 1
+        start_column, end_column = column_monster - half_local_view, column_monster + half_local_view + 1
+
+        local_view = grid[start_line:end_line, start_column:end_column]
 
         return local_view
+

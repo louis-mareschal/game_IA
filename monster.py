@@ -22,16 +22,7 @@ class Monster(pygame.sprite.Sprite):
         self.net_monster = net
 
     def check_hit_wall(self):
-        if (
-                self.rect.top <= config.WINDOW_STATS_HEIGHT
-                or self.rect.bottom >= config.WINDOW_HEIGHT
-                or self.rect.left <= 0
-                or self.rect.right >= config.WINDOW_WIDTH
-        ):
-            self.life -= 1
-
-    def get_next_move(self, player, grid):
-        return self.net_monster.activate(self.get_local_view(player, grid).flatten())
+        return self.rect.top <= config.WINDOW_STATS_HEIGHT or self.rect.bottom >= config.WINDOW_HEIGHT or self.rect.left <= 0 or self.rect.right >= config.WINDOW_WIDTH
 
     def move(self, next_move_monster: typing.List[float]):
         match np.argmax(next_move_monster):
@@ -111,24 +102,3 @@ class Monster(pygame.sprite.Sprite):
             self.move_down()
         elif self.rect.right < config.WINDOW_WIDTH:
             self.move_right()
-
-    def get_local_view_optimized(self, player, empty_grid):
-        grid = np.array(empty_grid)
-        size_grid = (grid.shape[0] + 2) // 3
-        center_y = (player.rect.centery - config.WINDOW_STATS_HEIGHT) // config.IMAGE_SIZE[0] + size_grid - 1
-        center_x = player.rect.centerx // config.IMAGE_SIZE[0] + size_grid - 1
-        grid[center_y, center_x] = 1
-
-        local_view_size = size_grid*2
-        half_local_view = size_grid
-
-        line_monster = (self.rect.centery - config.WINDOW_STATS_HEIGHT) // config.IMAGE_SIZE[0] + size_grid - 1
-        column_monster = self.rect.centerx // config.IMAGE_SIZE[0] + size_grid - 1
-
-        start_line, end_line = line_monster - half_local_view, line_monster + half_local_view + 1
-        start_column, end_column = column_monster - half_local_view, column_monster + half_local_view + 1
-
-        local_view = grid[start_line:end_line, start_column:end_column]
-
-        return local_view
-

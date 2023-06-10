@@ -3,7 +3,7 @@
 [NEAT]
 fitness_criterion     = max
 fitness_threshold     = 1000000
-pop_size              = 40
+pop_size              = 50
 reset_on_extinction   = False
 
 [DefaultGenome]
@@ -47,7 +47,7 @@ node_delete_prob        = 0
 
 # network parameters
 num_hidden              = 0
-num_inputs              = 49
+num_inputs              = 8
 num_outputs             = 8
 
 # node response options

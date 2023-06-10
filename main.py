@@ -10,15 +10,12 @@ from neat_modified.population import Population
 from neat_modified.checkpoint_reporter import Checkpointer
 from neat_modified.feed_forward import FeedForwardNetwork
 
-
 from game import Game
 from monster import Monster
-from player import Player
-from demo_game import DemoGame
 import config
 
 
-def eval_genomes(population: Population, training_number: int, training_nets: typing.List[FeedForwardNetwork]):
+def eval_genomes(population: Population):
     """
     The function runs a simulation with the current population of monsters or players and evaluates their fitness based
     on the number of collisions they have with their opponents.
@@ -57,28 +54,19 @@ def eval_genomes(population: Population, training_number: int, training_nets: ty
     for episode in range(1, config.MAX_NUMBER_EPISODE + 1):
         population.genome_reporter.start_episode()
 
-        game = Game(population.generation, training_number, episode, len(ge))
+        game = Game(population.generation, episode)
 
-        x_player = config.IMAGE_SIZE[0] * 0 #randint(0, config.WINDOW_WIDTH - config.IMAGE_SIZE[0])
-        y_player = config.WINDOW_STATS_HEIGHT + config.IMAGE_SIZE[0] * 0 #randint(config.WINDOW_STATS_HEIGHT, config.WINDOW_HEIGHT - config.IMAGE_SIZE[0])
-        x_monsters = config.IMAGE_SIZE[0] #randint(0, config.WINDOW_WIDTH - config.IMAGE_SIZE[0])
-        y_monsters = config.WINDOW_STATS_HEIGHT + config.IMAGE_SIZE[0] #randint(config.WINDOW_STATS_HEIGHT, config.WINDOW_HEIGHT - config.IMAGE_SIZE[0])
-        player = Player(x_player, y_player, len(ge))
-        game.add_player(player)
-
-        for index_entity in range(len(ge)):
+        index_entity = 0
+        while len(game.all_monsters) < len(ge):
             # Creating the monsters
-            monster = Monster(x_monsters, y_monsters, index_entity)
+            x_monster = randint(0, config.WINDOW_WIDTH - config.IMAGE_SIZE[0])
+            y_monster = randint(config.WINDOW_STATS_HEIGHT, config.WINDOW_HEIGHT - config.IMAGE_SIZE[0])
+            monster = Monster(x_monster, y_monster, index_entity)
+            if pygame.sprite.spritecollide(monster, game.all_monsters, False):
+                continue
             game.add_monster(monster)
+            index_entity += 1
 
-            # Adding the training nets from the last training (if any)
-            if training_nets:
-                if training_number % 2:
-                    player.set_net(training_nets[episode % config.NUMBER_NETS_TRAINING])
-                else:
-                    monster.set_net(
-                        training_nets[episode % config.NUMBER_NETS_TRAINING]
-                    )
         population.genome_reporter.set_init_time_episode()
         ge, nets, population = game.run_episode(nets, ge, population, pygame.display.get_surface())
 
@@ -107,20 +95,13 @@ def eval_genomes(population: Population, training_number: int, training_nets: ty
     # population.genome_reporter.print_time_stats()
 
 
-def run(_config_player_path: str, _config_monster_path: str):
+def run(_config_monster_path: str):
     """
     Run the alternative training considering a config for the players and one for the monsters
     Note : If there are any checkpoints, the configuration of the checkpoints will be used, so any changes to the config
     will not have any effect.
     """
     # Load configuration
-    neat_config_player = neat.Config(
-        neat.DefaultGenome,
-        neat.DefaultReproduction,
-        neat.DefaultSpeciesSet,
-        neat.DefaultStagnation,
-        _config_player_path,
-    )
     neat_config_monster = neat.Config(
         neat.DefaultGenome,
         neat.DefaultReproduction,
@@ -128,76 +109,45 @@ def run(_config_player_path: str, _config_monster_path: str):
         neat.DefaultStagnation,
         _config_monster_path,
     )
-
-    # Starting alternative training (training the monster on odd training numbers and the players on even)
-    for training_number in range(1, 2):  # config.NUMBER_TRAININGS * 2 + 1
-        if training_number % 2:
-            type_training = "monster"
-            number_generation = config.NUMBER_GEN_PER_TRAINING
-            neat_config = neat_config_monster
-
-        else:
-            type_training = "player"
-            number_generation = config.NUMBER_GEN_PER_TRAINING
-            neat_config = neat_config_player
-
-        print(
-            f"#### Training {type_training.capitalize()}s n°{(training_number + 1) // 2} ####"
-        )
-
-        # Create the population or load the last checkpoint
-        training_nets = []
-        checkpoint_dir_path = os.path.join(os.getcwd(), f"checkpoint_{type_training}")
-        if len(os.listdir(checkpoint_dir_path)):
-            # There are maximum 3 checkpoints in the checkpoint directory
-            checkpoint_name = sorted(
-                os.listdir(checkpoint_dir_path), key=lambda name: int(name[11:])
-            )[-1]
-            checkpoint_path = os.path.join(checkpoint_dir_path, checkpoint_name)
-            p = Checkpointer.restore_checkpoint(checkpoint_path)
-        else:
-            print("\n WARNING : CREATING A NEW POPULATION FROM SCRATCH \n")
-            p = Population(neat_config, checkpoint_dir_path)
+    # Create the population or load the last checkpoint
+    checkpoint_dir_path = os.path.join(os.getcwd(), f"checkpoint_monster")
+    if len(os.listdir(checkpoint_dir_path)):
+        # There are maximum 3 checkpoints in the checkpoint directory
+        checkpoint_name = sorted(
+            os.listdir(checkpoint_dir_path), key=lambda name: int(name[11:])
+        )[-1]
+        checkpoint_path = os.path.join(checkpoint_dir_path, checkpoint_name)
+        p = Checkpointer.restore_checkpoint(checkpoint_path)
+    else:
+        print("\n WARNING : CREATING A NEW POPULATION FROM SCRATCH \n")
+        p = Population(neat_config_monster, checkpoint_dir_path)
 
         # RUN THE TRAINING
         # Use of a lambda function to be able to give additional arguments
-        p.run(
-              lambda population: eval_genomes(population, training_number, training_nets),
-              number_generation,
-        )
+        p.run(eval_genomes, config.NUMBER_GEN)
 
         # Stats
         p.genome_reporter.print_best_fitnesses(20)
         training_genomes = p.genome_reporter.best_genomes(config.NUMBER_NETS_TRAINING)
 
         for i, genome in enumerate(training_genomes):
-            DemoGame(genome, neat_config,
-                     p.generation).show_demo(3)
-            p.genome_reporter.draw_net(neat_config, genome, f"network_genome_{i + 1}")
-
-        # Saving the best nets for the alternative training
-        training_nets = [
-            FeedForwardNetwork.create(genome, neat_config)
-            for genome in training_genomes
-        ]
+            p.genome_reporter.draw_net(neat_config_monster, genome, f"network_genome_{i + 1}")
 
 
 if __name__ == "__main__":
     # Initialization
     os.makedirs("checkpoint_monster", exist_ok=True)
-    os.makedirs("checkpoint_player", exist_ok=True)
     random.seed(10)
-    config_player_path = os.path.join(os.getcwd(), "config_player.txt")
     config_monster_path = os.path.join(os.getcwd(), "config_monster.txt")
 
     # Pygame
     pygame.init()
     pygame.display.set_caption(
-        "AI alternative reinforcement training using genetic algorithm"
+        "AI reinforcement training using genetic algorithm"
     )
     pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
     os.environ["SDL_VIDEO_WINDOW_POS"] = "0,0"
     pygame.mouse.set_visible(False)
 
     # Running
-    run(config_player_path, config_monster_path)
+    run(config_monster_path)
